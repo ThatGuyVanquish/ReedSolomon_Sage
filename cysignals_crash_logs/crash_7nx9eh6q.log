@@ -1,0 +1,218 @@
+GNU gdb (GDB) 13.1
+Copyright (C) 2023 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Type "show copying" and "show warranty" for details.
+This GDB was configured as "x86_64-pc-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<https://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+    <http://www.gnu.org/software/gdb/documentation/>.
+
+For help, type "help".
+Type "apropos word" to search for commands related to "word".
+[New LWP 3100]
+[New LWP 3101]
+[New LWP 3102]
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.archlinux.org>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/usr/lib/libthread_db.so.1".
+0x00007fb2900fb3a7 in wait4 () from /usr/lib/libc.so.6
+
+Stack backtrace
+---------------
+No symbol table info available.
+#1  0x00007fb28dfc7577 in ?? ()
+   from /usr/lib/python3.11/site-packages/cysignals/signals.cpython-311-x86_64-linux-gnu.so
+No symbol table info available.
+#2  0x00007fb28dfc770a in ?? ()
+   from /usr/lib/python3.11/site-packages/cysignals/signals.cpython-311-x86_64-linux-gnu.so
+No symbol table info available.
+#3  0x00007fb28dfc9c2d in ?? ()
+   from /usr/lib/python3.11/site-packages/cysignals/signals.cpython-311-x86_64-linux-gnu.so
+No symbol table info available.
+#4  <signal handler called>
+No symbol table info available.
+#5  0x00007fb221bf1478 in DoOperation1Args () from /usr/lib/libgap.so.8
+No symbol table info available.
+#6  0x00007fb221bc2796 in GAP_EvalString () from /usr/lib/libgap.so.8
+No symbol table info available.
+#7  0x00007fb2229b6407 in ?? ()
+   from /usr/lib/python3.11/site-packages/sage/libs/gap/util.cpython-311-x86_64-linux-gnu.so
+No symbol table info available.
+#8  0x00007fb221ac14b8 in ?? ()
+   from /usr/lib/python3.11/site-packages/sage/libs/gap/libgap.cpython-311-x86_64-linux-gnu.so
+No symbol table info available.
+#9  0x00007fb221acc065 in ?? ()
+   from /usr/lib/python3.11/site-packages/sage/libs/gap/libgap.cpython-311-x86_64-linux-gnu.so
+No symbol table info available.
+#10 0x00007fb221ac9442 in ?? ()
+   from /usr/lib/python3.11/site-packages/sage/libs/gap/libgap.cpython-311-x86_64-linux-gnu.so
+No symbol table info available.
+#11 0x00007fb2903eadfc in _PyObject_MakeTpCall ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#12 0x00007fb29043d08b in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#13 0x00007fb290420f4d in PyObject_CallOneArg ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#14 0x00007fb2904e838d in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#15 0x00007fb290474276 in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#16 0x00007fb27b29bd09 in ?? ()
+   from /usr/lib/python3.11/site-packages/sage/misc/lazy_import.cpython-311-x86_64-linux-gnu.so
+No symbol table info available.
+#17 0x00007fb290412869 in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#18 0x00007fb2903f5f6f in _PyEval_EvalFrameDefault ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#19 0x00007fb29043d403 in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#20 0x00007fb29043d03e in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#21 0x00007fb2903f8e77 in _PyEval_EvalFrameDefault ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#22 0x00007fb29041b9e0 in _PyFunction_Vectorcall ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#23 0x00007fb2903ee6d7 in _PyObject_FastCallDictTstate ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#24 0x00007fb290423dfd in _PyObject_Call_Prepend ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#25 0x00007fb2904eb472 in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#26 0x00007fb2903eadfc in _PyObject_MakeTpCall ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#27 0x00007fb2903f5379 in _PyEval_EvalFrameDefault ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#28 0x00007fb29043d403 in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#29 0x00007fb29043d03e in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#30 0x00007fb29054c912 in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#31 0x00007fb29052ac7c in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#32 0x00007fb29052ad6a in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#33 0x00007fb29052adee in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#34 0x00007fb2903fdd71 in _PyEval_EvalFrameDefault ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#35 0x00007fb2904af9aa in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#36 0x00007fb2904af3bc in PyEval_EvalCode ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#37 0x00007fb2904c62f2 in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#38 0x00007fb290403eba in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#39 0x00007fb2904030d7 in PyObject_Vectorcall ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#40 0x00007fb2903ffa43 in _PyEval_EvalFrameDefault ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#41 0x00007fb2904af9aa in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#42 0x00007fb2904af3bc in PyEval_EvalCode ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#43 0x00007fb2904cd503 in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#44 0x00007fb2904c93ca in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#45 0x00007fb2904dfcf3 in ?? () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#46 0x00007fb2904df525 in _PyRun_SimpleFileObject ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#47 0x00007fb2904ddf18 in _PyRun_AnyFileObject ()
+   from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#48 0x00007fb2904d87e8 in Py_RunMain () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#49 0x00007fb2904a1c3b in Py_BytesMain () from /usr/lib/libpython3.11.so.1.0
+No symbol table info available.
+#50 0x00007fb29004a850 in ?? () from /usr/lib/libc.so.6
+No symbol table info available.
+#51 0x00007fb29004a90a in __libc_start_main () from /usr/lib/libc.so.6
+No symbol table info available.
+#52 0x000055bd6afc8045 in _start ()
+No symbol table info available.
+
+
+Cython backtrace
+----------------
+#0  0x00007fb2900fb350 in wait4 ()
+#1  0x0000000000000000 in ?? ()
+#2  0x0000000000000000 in ?? ()
+#3  0x0000000000000000 in ?? ()
+#4  0x0000000000000000 in ?? ()
+#5  0x00007fb221bf1450 in DoOperation1Args ()
+#6  0x00007fb221bc2730 in GAP_EvalString ()
+#7  0x0000000000000000 in ?? ()
+#8  0x0000000000000000 in ?? ()
+#9  0x0000000000000000 in ?? ()
+#10 0x0000000000000000 in ?? ()
+#11 0x00007fb2903eab70 in _PyObject_MakeTpCall ()
+#12 0x0000000000000000 in ?? ()
+#13 0x00007fb290420ef0 in PyObject_CallOneArg ()
+#14 0x0000000000000000 in ?? ()
+#15 0x0000000000000000 in ?? ()
+#16 0x0000000000000000 in ?? ()
+#17 0x0000000000000000 in ?? ()
+#18 0x00007fb2903f4c20 in _PyEval_EvalFrameDefault ()
+#19 0x0000000000000000 in ?? ()
+#20 0x0000000000000000 in ?? ()
+#21 0x00007fb2903f4c20 in _PyEval_EvalFrameDefault ()
+#22 0x00007fb29041b850 in _PyFunction_Vectorcall ()
+#23 0x00007fb2903ee670 in _PyObject_FastCallDictTstate ()
+#24 0x00007fb290423d90 in _PyObject_Call_Prepend ()
+#25 0x0000000000000000 in ?? ()
+#26 0x00007fb2903eab70 in _PyObject_MakeTpCall ()
+#27 0x00007fb2903f4c20 in _PyEval_EvalFrameDefault ()
+#28 0x0000000000000000 in ?? ()
+#29 0x0000000000000000 in ?? ()
+#30 0x0000000000000000 in ?? ()
+#31 0x0000000000000000 in ?? ()
+#32 0x0000000000000000 in ?? ()
+#33 0x0000000000000000 in ?? ()
+#34 0x00007fb2903f4c20 in _PyEval_EvalFrameDefault ()
+#35 0x0000000000000000 in ?? ()
+#36 0x00007fb2904af310 in PyEval_EvalCode ()
+#37 0x0000000000000000 in ?? ()
+#38 0x0000000000000000 in ?? ()
+#39 0x00007fb2904030a0 in PyObject_Vectorcall ()
+#40 0x00007fb2903f4c20 in _PyEval_EvalFrameDefault ()
+#41 0x0000000000000000 in ?? ()
+#42 0x00007fb2904af310 in PyEval_EvalCode ()
+#43 0x0000000000000000 in ?? ()
+#44 0x0000000000000000 in ?? ()
+#45 0x0000000000000000 in ?? ()
+#46 0x00007fb2904df360 in _PyRun_SimpleFileObject ()
+#47 0x00007fb2904dded0 in _PyRun_AnyFileObject ()
+#48 0x00007fb2904d84e0 in Py_RunMain ()
+#49 0x00007fb2904a1c00 in Py_BytesMain ()
+#50 0x0000000000000000 in ?? ()
+#51 0x00007fb29004a880 in __libc_start_main ()
+#52 0x000055bd6afc8020 in _start ()
+
+[Inferior 1 (process 3099) detached]
