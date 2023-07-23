@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 def rs_encoder(msg, n, gf):
     """
-    Reed Solomon Interpolation encoder
+    Reed Solomon encoder
     ------------------------------------------------------
     Parameters:
     :param msg - message to be encoded, given as a list
@@ -42,8 +42,8 @@ def rs_encoder(msg, n, gf):
 
 def error_generator(codeword, num_of_errors, gf):
     """
-    # Error Generator
-    ---
+    Error Generator
+    ------------------------------------------------------
     Parameters:
     :param codeword      - encoded message
     :param num_of_errors - number of errors to be introduced
@@ -80,7 +80,7 @@ def error_generator(codeword, num_of_errors, gf):
 def rs_decoder(codeword, k, num_of_errors, gf):
     """
     Reed Solomon Unique Decoder
-    ---
+    ------------------------------------------------------
     This is my implementation of the Berlekamp-Welch unique decoder algorithm
     Parameters:
     :param codeword      - message to be decoded, given as a list
@@ -156,8 +156,8 @@ def rs_decoder(codeword, k, num_of_errors, gf):
 
 def get_agreeing_factors(factors, xs, ys, agreement_factor, k):
     """
-    Method to obtain factors which have an agreement factor >= t and degree <=k
-    ---
+    Method to obtain factors which have less than n - agreement_factor errors and degree <=k
+    ------------------------------------------------------
     Parameters:
     :param factors          - list of polynomials f for which to check if f(x_i) = y_i for at least t values
     :param xs               - list of x values
@@ -252,10 +252,7 @@ def rs_list_decoder(codeword, k, num_of_errors, gf):
 
     t = n - num_of_errors
 
-    print(f"Factors list is {factors_list}")
-    p = factors_list[0]
-
-    print()
+    # print(f"Factors list is {factors_list}")
     if len(factors_list) == 0:
         return None
 
@@ -269,10 +266,11 @@ def rs_list_decoder(codeword, k, num_of_errors, gf):
     for f in good_factors:
         current_msg = []
         for a in alphas:
-            current_msg.append(p(a))
+            current_msg.append(f(a))
         msg_list.append(current_msg)
 
     return msg_list
+
 
 """
     TESTS:
@@ -774,13 +772,7 @@ def test_decoders(gf, ks):
     plot_test_success_with_errors(t22_res)
 
 
-poly = randomize_poly(GF97, 7)
-print(f"poly = {PolynomialRing(GF97, 'x')(poly)}")
-encoded = rs_encoder(poly, 97, GF97)
-# print(encoded)
-# def rs_list_decoder(codeword, k, num_of_errors, gf):
-botched_codeword = error_generator(encoded, 0, GF97)[0]
-res = rs_list_decoder(botched_codeword.list(), 7, 0, GF97)
-print("The returned polynomials are:")
-for msg in res:
-    print(msg)
+"""
+TESTS ARE HERE
+"""
+# test_decoders(GF97, ks_for_gf7)
