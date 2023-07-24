@@ -154,32 +154,33 @@ def rs_decoder(codeword, k, num_of_errors, gf):
     return PolynomialRing(ring, 'x')(original_message_coefficients)
 
 
-def get_agreeing_factors(factors, xs, ys, agreement_factor, k):
+def get_factors_with_less_errors(factors, xs, ys, num_of_errors, k):
     """
-    Method to obtain factors which have less than n - agreement_factor errors and degree <=k
+    Method to obtain factors which have at most num_of_errors errors and degree <=k
     ------------------------------------------------------
     Parameters:
-    :param factors          - list of polynomials f for which to check if f(x_i) = y_i for at least t values
-    :param xs               - list of x values
-    :param ys               - list of y values
-    :param agreement_factor - factor t to check if there is a good agreement
-    :param k                - maximum degree of factor
-    :return a list of all polynomials f ∈ factors such that their agreement factor is at least t,
-        I.E. |{i | f(xi) = yi}| <= t :
+    :param factors       - list of polynomials f for which to check if f(x_i) != y_i for at most num_of_error values
+    :param xs            - list of x values
+    :param ys            - list of y values
+    :param num_of_errors - number of errors in the given codeword
+    :param k             - maximum degree of factor
+    :return a list of all polynomials f ∈ factors such that their degree is at most k and have at most num_of_errors
+            errors
     This is done in a brute force manner, checking each factor against every x_i, y_i pairing
     """
-    agreeing_factors = []
+    good_factors = []
     for factor in factors:
         if factor.degree() > k:
             continue
-        agreement_counter = 0
+        current_errors = 0
         for x, y in zip(xs, ys):
-            if factor(x) == y:
-                agreement_counter += 1
-        if agreement_counter >= agreement_factor:
-            agreeing_factors.append(factor)
-        # print(f"Number of agreeing factors for {factor} is = {agreement_counter}")
-    return agreeing_factors
+            if factor(x) != y:
+                current_errors += 1
+                if current_errors > num_of_errors:
+                    break
+        if current_errors <= num_of_errors:
+            good_factors.append(factor)
+    return good_factors
 
 
 def get_p_from_factor(factor, ring):
@@ -197,21 +198,7 @@ def get_p_from_factor(factor, ring):
     return None
 
 
-def rs_list_decoder(codeword, k, num_of_errors, gf):
-    """
-    # Reed Solomon List Decoder
-    ---
-    This is my implementation of the Sudan List Decoder algorithm
-    Parameters:
-    :param codeword      - message to be decoded, given as a list
-    :param k             - length of the original message
-    :param num_of_errors - number of errors in the received codeword
-    :param gf            - finite field over which to decode
-    :return a list of all polynomials f ∈ F[X] of degree at most k such that they have less than num_of_errors errors:
-    1. Calculate the linear equations necessary to find the coefficients q_ij of the Q bi-variate polynomial
-    2. Once found the coefficients, factor Q
-    3. Return a list of all the factors with less than num_of_errors errors
-    """
+def rs_list_decoder(codeword, k, num_of_errors, GF):
     n = len(codeword)
     D = int(sqrt(2 * k * n))
 
@@ -223,9 +210,9 @@ def rs_list_decoder(codeword, k, num_of_errors, gf):
                 y_coeff = codeword[alpha]
                 if y_coeff == 0 and j == 0:  # Avoiding exception for 0^0
                     y_coeff = 1
-                equations[alpha].append(gf(alpha ** i * y_coeff ** j))
+                equations[alpha].append(GF(alpha ** i * y_coeff ** j))
 
-    equations_matrix = Matrix(gf, equations)
+    equations_matrix = Matrix(GF, equations)
     unknowns = equations_matrix.right_kernel().matrix()[0]
 
     qij = [[] for _ in range(D // k + 1)]
@@ -235,7 +222,7 @@ def rs_list_decoder(codeword, k, num_of_errors, gf):
             qij[j].append(unknowns[index])
             index += 1
 
-    ring = PolynomialRing(gf, ['x', 'y'])
+    ring = PolynomialRing(GF, ['x', 'y'])
     Q = ring(0)
     x, y = ring.gens()
 
@@ -250,14 +237,11 @@ def rs_list_decoder(codeword, k, num_of_errors, gf):
         if p is not None:
             factors_list.append(p)
 
-    t = n - num_of_errors
-
-    # print(f"Factors list is {factors_list}")
     if len(factors_list) == 0:
         return None
 
     # Obtain the factors with less than num_of_errors errors
-    good_factors = get_agreeing_factors(factors_list, list(range(n)), codeword, t, k)
+    good_factors = get_factors_with_less_errors(factors_list, list(range(n)), codeword, num_of_errors, k)
 
     # Evaluate the obtained factors at the first k alphas of the field to obtain a list of polynomial coefficients
     # which should contain the original message
@@ -316,19 +300,19 @@ def test(msg, n, gf=FiniteField(7), errors=0, should_print=False):
         result = (True, None)
         if should_print:
             print("Unique Decoded Successfully: ", unique_decoded.list())
-    except Exception:
+    except:
         result = (False, None)
         if should_print:
             print("Failed Unique Decoding: ", unique_decoded.list())
 
     list_decoded = None
     try:
-        list_decoded = rs_list_decoder(received_codeword.list(), k=len(msg), num_of_errors=errors, gf=gf)
+        list_decoded = rs_list_decoder(received_codeword.list(), k=len(msg), num_of_errors=errors, GF=gf)
         assert msg in list_decoded
         result = (result[0], True)
         if should_print:
             print("List Decoded Successfully: ", list_decoded)
-    except Exception:
+    except:
         result = (result[0], False)
         if should_print:
             print("Failed List Decoding: ", list_decoded)
@@ -642,6 +626,11 @@ def test_22(gf, ks):
     return results_for_k
 
 
+"""
+    METHODS FOR PLOTTING RESULTS
+"""
+
+
 def plot_success_rate(results, decoder):
     success_rate = {}
     n_values = {}
@@ -653,7 +642,29 @@ def plot_success_rate(results, decoder):
             n_values[k].append(n)
 
     for k in success_rate:
-        plt.plot(n_values[k], success_rate[k], label=f"k={k}")
+        plt.plot(n_values[k], success_rate[k], label=f"k={k}", marker="o", markersize=3)
+
+    plt.xlabel('n')
+    decoder_str = "Unique Decoder" if decoder == 'ud' else "List Decoder"
+    plt.ylabel(f"Success rate for {decoder_str}")
+    plt.legend()
+    plt.show()
+
+
+def plot_success_rate_point(results, decoder):
+    success_rate = {}
+    n_values = {}
+    for k in results:
+        success_rate[k] = []
+        n_values[k] = []
+        for n in results[k]:
+            success_rate[k].append(results[k][n][decoder] / results[k][n]['runs'])
+            n_values[k].append(n)
+
+    for k in success_rate:
+        plt.plot(n_values[k], success_rate[k], label=f"k={k}", marker="o", markersize=3)
+        for i in range(len(n_values[k])):
+            plt.annotate(f"({n_values[k][i]}, {float(success_rate[k][i]):.2f})", (n_values[k][i] + 0.01, success_rate[k][i]))
     plt.xlabel('n')
     decoder_str = "Unique Decoder" if decoder == 'ud' else "List Decoder"
     plt.ylabel(f"Success rate for {decoder_str}")
@@ -681,7 +692,38 @@ def plot_success_rate_difference(results):
             success_rate[k].append(ud_rate - ld_rate)
 
     for k in success_rate:
-        plt.plot(n_values[k], success_rate[k], label=f"k={k}")
+        plt.plot(n_values[k], success_rate[k], label=f"k={k}", marker="o", markersize=3)
+
+    plt.xlabel('n')
+    plt.ylabel(f"Success rate difference between unique and list decoders")
+    plt.legend()
+    plt.show()
+
+
+def plot_success_rate_difference_point(results):
+    ud_success_rate = {}
+    ld_success_rate = {}
+    n_values = {}
+    for k in results:
+        ud_success_rate[k] = []
+        ld_success_rate[k] = []
+        n_values[k] = []
+        for n in results[k]:
+            ud_success_rate[k].append(results[k][n]['ud'] / results[k][n]['runs'])
+            ld_success_rate[k].append(results[k][n]['ld'] / results[k][n]['runs'])
+            n_values[k].append(n)
+
+    success_rate = {}
+    for k in ud_success_rate:
+        success_rate[k] = []
+        for ud_rate, ld_rate in zip(ud_success_rate[k], ld_success_rate[k]):
+            success_rate[k].append(ud_rate - ld_rate)
+
+    for k in success_rate:
+        plt.plot(n_values[k], success_rate[k], label=f"k={k}", marker="o", markersize=3)
+        for i in range(len(n_values[k])):
+            plt.annotate(f"({n_values[k][i]}, {float(success_rate[k][i]):.2f})", (n_values[k][i] + 0.01, success_rate[k][i]))
+
     plt.xlabel('n')
     plt.ylabel(f"Success rate difference between unique and list decoders")
     plt.legend()
@@ -701,15 +743,41 @@ def plot_test_success_rate(results, string):
     plt.show()
 
 
-def plot_test_success_with_errors(results):
+def plot_test_success_rate_point(results, string):
+    print(f"Success rate of Unique Decoder {string}:")
+    plot_success_rate_point(results, 'ud')
+
+    print(f"Success rate of List Decoder {string}:")
+    plot_success_rate_point(results, 'ld')
+
+    print(f"Success rate difference between unique and list decoders {string}:")
+    plot_success_rate_difference_point(results)
+
+    plt.show()
+
+
+# def plot_test_success_with_errors(results):
+#     print("Success rate of Unique Decoder with increasing number of errors:")
+#     plot_success_rate(results, 'ud')
+#
+#     print("Success rate of List Decoder with increasing number of errors:")
+#     plot_success_rate(results, 'ld')
+#
+#     print("Success rate of difference between unique and list decoders with increasing number of errors:")
+#     plot_success_rate_difference(results)
+#
+#     plt.show()
+
+
+def plot_test_success_with_errors_point(results): # Used for test 1.4
     print("Success rate of Unique Decoder with increasing number of errors:")
-    plot_success_rate(results, 'ud')
+    plot_success_rate_point(results, 'ud')
 
     print("Success rate of List Decoder with increasing number of errors:")
-    plot_success_rate(results, 'ld')
+    plot_success_rate_point(results, 'ld')
 
     print("Success rate of difference between unique and list decoders with increasing number of errors:")
-    plot_success_rate_difference(results)
+    plot_success_rate_difference_point(results)
 
     plt.show()
 
@@ -725,7 +793,7 @@ def plot_compare_21(t0_res, t1_res, t2_res, decoder):
     errors = [0, 1, 2]
     decoder_str = "Unique Decoder" if decoder == 'ud' else "List Decoder"
     for k in success_rate_per_error:
-        plt.plot(errors, success_rate_per_error[k], label=f"k={k}")
+        plt.plot(errors, success_rate_per_error[k], label=f"k={k}", marker="o", markersize=3)
     plt.xlabel('Errors')
     plt.ylabel(f'Success rate for the {decoder_str}')
     plt.legend()
@@ -747,19 +815,19 @@ def test_decoders(gf, ks):
 
     print("Test 1.4:")
     t14_res = test_14(gf, ks)
-    plot_test_success_with_errors(t14_res)
+    plot_test_success_with_errors_point(t14_res)
 
     print("Test 2.1.1:")
     t211_res = test_211(gf, ks)
-    plot_test_success_rate(t211_res, "with n=k and without errors")
+    plot_test_success_rate_point(t211_res, "with n=k and without errors")
 
     print("Test 2.1.2:")
     t212_res = test_212(gf, ks)
-    plot_test_success_rate(t212_res, "with n=k and with 1 error")
+    plot_test_success_rate_point(t212_res, "with n=k and with 1 error")
 
     print("Test 2.1.3:")
     t213_res = test_213(gf, ks)
-    plot_test_success_rate(t213_res, "with n=k and with 2 errors")
+    plot_test_success_rate_point(t213_res, "with n=k and with 2 errors")
 
     print("Success rate for k=n with and without errors for the Unique Decoder:")
     plot_compare_21(t211_res, t212_res, t213_res, 'ud')
@@ -769,7 +837,7 @@ def test_decoders(gf, ks):
 
     print("Test 2.2:")
     t22_res = test_22(gf, ks)
-    plot_test_success_with_errors(t22_res)
+    plot_test_success_with_errors_point(t22_res)
 
 
 """
