@@ -267,7 +267,7 @@ def rs_list_decoder(codeword, k, num_of_errors, GF):
 """
 
 # Global variables
-num_of_polys_per_k = 5
+num_of_polys_per_k = 10
 num_of_params = 10
 
 # Finite fields:
