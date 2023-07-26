@@ -1,6 +1,7 @@
 from sage.all import *
 import random
 import matplotlib.pyplot as plt
+import numpy as np
 
 """
     Execution instructions:
@@ -105,7 +106,7 @@ def rs_decoder(codeword, k, num_of_errors, gf):
     # Generate the linear equations to calculate the original message polynomial based on the Berlekamp-Welch algorithm
 
     # Calculate the result column of the linear equations
-    result_column = [int((-1) * element * (alpha ** 2)) for alpha, element in enumerate(codeword)]
+    result_column = [int((-1) * element * (i ** 2)) for i, element in enumerate(codeword)]
 
     # Calculate the linear equations coefficients
     equations = [[0] * n for _ in range(n)]
@@ -121,10 +122,15 @@ def rs_decoder(codeword, k, num_of_errors, gf):
                 equations[i][j] = (q - ((i ** (j - 2)) % q)) % q
 
     # Solve equations*unknowns = result_column
-    try:
-        unknowns = Matrix(ring, equations).solve_right(vector(ring, result_column))
-    except Exception:
-        return None
+    try:  # First solution is reducing the equations|result matrix, otherwise try solve_right
+        linear_equations = Matrix(ring, equations).augment(Matrix(ring, result_column).transpose())
+        rref_mat = Matrix(ring, linear_equations).rref()
+        unknowns = rref_mat.column(n)
+    except:
+        try:
+            unknowns = Matrix(ring, equations).solve_right(vector(ring, result_column))
+        except:  # This fails if the received codeword is [0] * n
+            return None
 
     # Find the error locator polynomial
 
@@ -149,7 +155,7 @@ def rs_decoder(codeword, k, num_of_errors, gf):
 
     interpolated_symbols = ring.lagrange_polynomial(zip(correct_symbol_indices, correct_symbols))
 
-    original_message_coefficients = [interpolated_symbols(index) for index in range(k)]
+    original_message_coefficients = [interpolated_symbols(i) for i in range(k)]
 
     return PolynomialRing(ring, 'x')(original_message_coefficients)
 
@@ -198,7 +204,7 @@ def get_p_from_factor(factor, ring):
     return None
 
 
-def rs_list_decoder(codeword, k, num_of_errors, GF):
+def rs_list_decoder(codeword, k, num_of_errors, gf):
     n = len(codeword)
     D = int(sqrt(2 * k * n))
 
@@ -210,9 +216,9 @@ def rs_list_decoder(codeword, k, num_of_errors, GF):
                 y_coeff = codeword[alpha]
                 if y_coeff == 0 and j == 0:  # Avoiding exception for 0^0
                     y_coeff = 1
-                equations[alpha].append(GF(alpha ** i * y_coeff ** j))
+                equations[alpha].append(gf(alpha ** i * y_coeff ** j))
 
-    equations_matrix = Matrix(GF, equations)
+    equations_matrix = Matrix(gf, equations)
     unknowns = equations_matrix.right_kernel().matrix()[0]
 
     qij = [[] for _ in range(D // k + 1)]
@@ -222,7 +228,7 @@ def rs_list_decoder(codeword, k, num_of_errors, GF):
             qij[j].append(unknowns[index])
             index += 1
 
-    ring = PolynomialRing(GF, ['x', 'y'])
+    ring = PolynomialRing(gf, ['x', 'y'])
     Q = ring(0)
     x, y = ring.gens()
 
@@ -282,7 +288,7 @@ ks_for_gf929 = [3, 45, 100, 200, 400]
 
 def test(msg, n, gf=FiniteField(7), errors=0, should_print=False):
     ring = PolynomialRing(gf, 'x')
-    result = (None, None)
+    # result = (None, None)
     if should_print:
         print("Original Message: ", msg)
 
@@ -307,7 +313,7 @@ def test(msg, n, gf=FiniteField(7), errors=0, should_print=False):
 
     list_decoded = None
     try:
-        list_decoded = rs_list_decoder(received_codeword.list(), k=len(msg), num_of_errors=errors, GF=gf)
+        list_decoded = rs_list_decoder(received_codeword.list(), k=len(msg), num_of_errors=errors, gf=gf)
         assert msg in list_decoded
         result = (result[0], True)
         if should_print:
@@ -493,23 +499,30 @@ def test_14(gf, ks):
         k_polys = [randomize_poly(gf, k) for _ in range(num_of_polys_per_k)]
         polynomials[k] = k_polys
         max_error_for_nk = (n - k) // 2
-        # Generate num_of_params errors from 0 to floor((n-k)/2)
-        errors = [random.randint(0, max_error_for_nk) for _ in range(num_of_params)]
-        errors.sort()
+        # Generate num_of_params errors from 1 to floor((n-k)/2)
+        errors = [err for err in range(1, max_error_for_nk + 1)]
         errors_for_k[k] = errors
 
     results_for_k = {}
+    runs = 0
 
     for k in polynomials:
-        runs = []
+        results_for_k[k] = {}
         p_list = polynomials[k]
         for poly in p_list:
-            error_list = errors_for_k[k]
-            p_runs = [[poly, n, gf, error_list[index]] for index in range(len(error_list))]
-            runs.extend(p_runs)
+            for error in errors_for_k[k]:
+                res = test(poly, n, gf, error)
+                runs += 1
+                if error in results_for_k[k]:
+                    results_for_k[k][error]['runs'] += 1
+                else:
+                    results_for_k[k][error] = {'runs': 1, 'ud': 0, 'ld': 0}
+                if res[0]:
+                    results_for_k[k][error]['ud'] += 1
+                if res[1]:
+                    results_for_k[k][error]['ld'] += 1
 
-        results_for_k[k] = test_suite(runs)
-
+    print(f"Number of runs = {runs}")
     return results_for_k
 
 
@@ -631,18 +644,27 @@ def test_22(gf, ks):
 """
 
 
-def plot_success_rate(results, decoder):
+def plot_success_rate(results, decoder, max_n):
     success_rate = {}
     n_values = {}
+    n_values_set = set()
+
     for k in results:
         success_rate[k] = []
         n_values[k] = []
         for n in results[k]:
             success_rate[k].append(results[k][n][decoder] / results[k][n]['runs'])
             n_values[k].append(n)
+            n_values_set.add(n)
 
     for k in success_rate:
         plt.plot(n_values[k], success_rate[k], label=f"k={k}", marker="o", markersize=3)
+
+    if len(n_values_set) <= 10:
+        plt.xticks(list(sorted(n_values_set)))
+    else:
+        x_values = np.linspace(4, max_n, 10, endpoint=True)
+        plt.xticks([int(val) for val in x_values])
 
     plt.xlabel('n')
     decoder_str = "Unique Decoder" if decoder == 'ud' else "List Decoder"
@@ -651,20 +673,31 @@ def plot_success_rate(results, decoder):
     plt.show()
 
 
-def plot_success_rate_point(results, decoder):
+def plot_success_rate_point(results, decoder, max_n):
     success_rate = {}
     n_values = {}
+    n_values_set = set()
+
     for k in results:
         success_rate[k] = []
         n_values[k] = []
         for n in results[k]:
             success_rate[k].append(results[k][n][decoder] / results[k][n]['runs'])
             n_values[k].append(n)
+            n_values_set.add(n)
 
     for k in success_rate:
         plt.plot(n_values[k], success_rate[k], label=f"k={k}", marker="o", markersize=3)
         for i in range(len(n_values[k])):
-            plt.annotate(f"({n_values[k][i]}, {float(success_rate[k][i]):.2f})", (n_values[k][i] + 0.01, success_rate[k][i]))
+            plt.annotate(f"({n_values[k][i]}, {float(success_rate[k][i]):.2f})",
+                         (n_values[k][i] + 0.01, success_rate[k][i]))
+
+    if len(n_values_set) <= 10:
+        plt.xticks(list(sorted(n_values_set)))
+    else:
+        x_values = np.linspace(4, max_n, 10, endpoint=True)
+        plt.xticks([int(val) for val in x_values])
+
     plt.xlabel('n')
     decoder_str = "Unique Decoder" if decoder == 'ud' else "List Decoder"
     plt.ylabel(f"Success rate for {decoder_str}")
@@ -672,10 +705,12 @@ def plot_success_rate_point(results, decoder):
     plt.show()
 
 
-def plot_success_rate_difference(results):
+def plot_success_rate_difference(results, max_n):
     ud_success_rate = {}
     ld_success_rate = {}
     n_values = {}
+    n_values_set = set()
+
     for k in results:
         ud_success_rate[k] = []
         ld_success_rate[k] = []
@@ -684,6 +719,7 @@ def plot_success_rate_difference(results):
             ud_success_rate[k].append(results[k][n]['ud'] / results[k][n]['runs'])
             ld_success_rate[k].append(results[k][n]['ld'] / results[k][n]['runs'])
             n_values[k].append(n)
+            n_values_set.add(n)
 
     success_rate = {}
     for k in ud_success_rate:
@@ -694,16 +730,23 @@ def plot_success_rate_difference(results):
     for k in success_rate:
         plt.plot(n_values[k], success_rate[k], label=f"k={k}", marker="o", markersize=3)
 
+    if len(n_values_set) <= 10:
+        plt.xticks(list(sorted(n_values_set)))
+    else:
+        x_values = np.linspace(4, max_n, 10, endpoint=True)
+        plt.xticks([int(val) for val in x_values])
+
     plt.xlabel('n')
     plt.ylabel(f"Success rate difference between unique and list decoders")
     plt.legend()
     plt.show()
 
 
-def plot_success_rate_difference_point(results):
+def plot_success_rate_difference_point(results, max_n):
     ud_success_rate = {}
     ld_success_rate = {}
     n_values = {}
+    n_values_set = set()
     for k in results:
         ud_success_rate[k] = []
         ld_success_rate[k] = []
@@ -712,6 +755,7 @@ def plot_success_rate_difference_point(results):
             ud_success_rate[k].append(results[k][n]['ud'] / results[k][n]['runs'])
             ld_success_rate[k].append(results[k][n]['ld'] / results[k][n]['runs'])
             n_values[k].append(n)
+            n_values_set.add(n)
 
     success_rate = {}
     for k in ud_success_rate:
@@ -721,8 +765,15 @@ def plot_success_rate_difference_point(results):
 
     for k in success_rate:
         plt.plot(n_values[k], success_rate[k], label=f"k={k}", marker="o", markersize=3)
-        for i in range(len(n_values[k])):
-            plt.annotate(f"({n_values[k][i]}, {float(success_rate[k][i]):.2f})", (n_values[k][i] + 0.01, success_rate[k][i]))
+        for index in range(len(n_values[k])):
+            plt.annotate(f"({n_values[k][index]}, {float(success_rate[k][index]):.2f})",
+                         (n_values[k][index] + 0.01, success_rate[k][index]))
+
+    if len(n_values_set) <= 10:
+        plt.xticks(list(sorted(n_values_set)))
+    else:
+        x_values = np.linspace(4, max_n, 10, endpoint=True)
+        plt.xticks([int(val) for val in x_values])
 
     plt.xlabel('n')
     plt.ylabel(f"Success rate difference between unique and list decoders")
@@ -730,55 +781,98 @@ def plot_success_rate_difference_point(results):
     plt.show()
 
 
-def plot_test_success_rate(results, string):
+def plot_test_success_rate(results, string, max_n):
     print(f"Success rate of Unique Decoder {string}:")
-    plot_success_rate(results, 'ud')
+    plot_success_rate(results, 'ud', max_n)
 
     print(f"Success rate of List Decoder {string}:")
-    plot_success_rate(results, 'ld')
+    plot_success_rate(results, 'ld', max_n)
 
     print(f"Success rate difference between unique and list decoders {string}:")
-    plot_success_rate_difference(results)
+    plot_success_rate_difference(results, max_n)
 
     plt.show()
 
 
-def plot_test_success_rate_point(results, string):
+def plot_test_success_rate_point(results, string, max_n):
     print(f"Success rate of Unique Decoder {string}:")
-    plot_success_rate_point(results, 'ud')
+    plot_success_rate_point(results, 'ud', max_n)
 
     print(f"Success rate of List Decoder {string}:")
-    plot_success_rate_point(results, 'ld')
+    plot_success_rate_point(results, 'ld', max_n)
 
     print(f"Success rate difference between unique and list decoders {string}:")
-    plot_success_rate_difference_point(results)
+    plot_success_rate_difference_point(results, max_n)
 
     plt.show()
 
 
-# def plot_test_success_with_errors(results):
+# def plot_test_success_with_errors(results, max_n): # Used for test 1.4
 #     print("Success rate of Unique Decoder with increasing number of errors:")
-#     plot_success_rate(results, 'ud')
+#     plot_success_rate(results, 'ud', max_n)
 #
 #     print("Success rate of List Decoder with increasing number of errors:")
-#     plot_success_rate(results, 'ld')
+#     plot_success_rate(results, 'ld', max_n)
 #
 #     print("Success rate of difference between unique and list decoders with increasing number of errors:")
-#     plot_success_rate_difference(results)
+#     plot_success_rate_difference(results, max_n)
 #
 #     plt.show()
 
 
-def plot_test_success_with_errors_point(results): # Used for test 1.4
+def plot_test_success_with_errors_point(results, max_n):  # Used for test 1.4
     print("Success rate of Unique Decoder with increasing number of errors:")
-    plot_success_rate_point(results, 'ud')
+    plot_success_rate_point(results, 'ud', max_n)
 
     print("Success rate of List Decoder with increasing number of errors:")
-    plot_success_rate_point(results, 'ld')
+    plot_success_rate_point(results, 'ld', max_n)
 
     print("Success rate of difference between unique and list decoders with increasing number of errors:")
-    plot_success_rate_difference_point(results)
+    plot_success_rate_difference_point(results, max_n)
 
+    plt.show()
+
+
+def plot_test_14(results):
+    error_values_per_k = {}
+    error_values = set()
+    ud_res_per_k = {}
+    ld_res_per_k = {}
+    for k in results:
+        error_values_per_k[k] = []
+        ud_res_per_k[k] = {}
+        ld_res_per_k[k] = {}
+        for err in results[k]:
+            ud_res_per_k[k][err] = results[k][err]['ud'] / results[k][err]['runs']
+            ld_res_per_k[k][err] = results[k][err]['ld'] / results[k][err]['runs']
+            error_values_per_k[k].append(err)
+            error_values.add(err)
+
+    error_values = sorted(error_values)
+    min_error = 1
+    max_error = error_values[len(error_values) - 1]
+
+    if len(error_values) <= 10:
+        error_ticks = error_values
+    else:
+        error_ticks = np.linspace(min_error, max_error, 10, endpoint=True)
+        error_ticks = [int(err) for err in error_ticks]
+
+    for k in ud_res_per_k:
+        plt.plot(error_values_per_k[k], ud_res_per_k[k].values(), label=f"k={k}", marker="o", markersize=3)
+    plt.xticks(error_ticks)
+    plt.xlabel('Errors')
+    plt.ylabel(f'Success rate for the Unique Decoder')
+    plt.legend()
+    plt.show()
+
+    print("Success rate of List Decoder with increasing number of errors:")
+    for k in ld_res_per_k:
+        plt.plot(error_values_per_k[k], ld_res_per_k[k].values(), label=f"k={k}", marker="o", markersize=3)
+    plt.xticks(error_ticks)
+    plt.xlabel('Errors')
+    plt.ylabel(f'Success rate for the List Decoder')
+    plt.legend()
     plt.show()
 
 
@@ -794,6 +888,8 @@ def plot_compare_21(t0_res, t1_res, t2_res, decoder):
     decoder_str = "Unique Decoder" if decoder == 'ud' else "List Decoder"
     for k in success_rate_per_error:
         plt.plot(errors, success_rate_per_error[k], label=f"k={k}", marker="o", markersize=3)
+
+    plt.xticks(list(map(int, errors)))
     plt.xlabel('Errors')
     plt.ylabel(f'Success rate for the {decoder_str}')
     plt.legend()
@@ -801,34 +897,36 @@ def plot_compare_21(t0_res, t1_res, t2_res, decoder):
 
 
 def test_decoders(gf, ks):
+    q = gf.characteristic()
     print("Test 1.1:")
     t11_res = test_11(gf, ks)
-    plot_test_success_rate(t11_res, "without errors")
+    plot_test_success_rate(t11_res, "without errors", q)
 
     print("Test 1.2:")
     t12_res = test_12(gf, ks)
-    plot_test_success_rate(t12_res, "with 2 errors")
+    plot_test_success_rate(t12_res, "with 2 errors", q)
 
     print("Test 1.3:")
     t13_res = test_13(gf, ks)
-    plot_test_success_rate(t13_res, "with errors equal to 70% maximum error relative to n")
+    plot_test_success_rate(t13_res, "with errors equal to 70% maximum error relative to n", q)
 
     print("Test 1.4:")
     t14_res = test_14(gf, ks)
-    plot_test_success_with_errors_point(t14_res)
+    plot_test_14(t14_res)
 
     print("Test 2.1.1:")
     t211_res = test_211(gf, ks)
-    plot_test_success_rate_point(t211_res, "with n=k and without errors")
+    plot_test_success_rate_point(t211_res, "with n=k and without errors", q)
 
     print("Test 2.1.2:")
     t212_res = test_212(gf, ks)
-    plot_test_success_rate_point(t212_res, "with n=k and with 1 error")
+    plot_test_success_rate_point(t212_res, "with n=k and with 1 error", q)
 
     print("Test 2.1.3:")
     t213_res = test_213(gf, ks)
-    plot_test_success_rate_point(t213_res, "with n=k and with 2 errors")
+    plot_test_success_rate_point(t213_res, "with n=k and with 2 errors", q)
 
+    print("Test 2.1 comparison for errors:")
     print("Success rate for k=n with and without errors for the Unique Decoder:")
     plot_compare_21(t211_res, t212_res, t213_res, 'ud')
 
@@ -837,10 +935,415 @@ def test_decoders(gf, ks):
 
     print("Test 2.2:")
     t22_res = test_22(gf, ks)
-    plot_test_success_with_errors_point(t22_res)
+    plot_test_success_with_errors_point(t22_res, q)
+
+
+"""
+    FURTHER MANUAL TESTING:
+"""
+
+
+# for figure 1.2
+def fig12_tests():
+    n1 = 5
+    n2 = 6
+
+    p1 = [1, 5, 2]
+    ep15 = rs_encoder(p1, n1, GF7).list()
+    ep16 = rs_encoder(p1, n2, GF7).list()
+
+    print(rs_list_decoder(ep15, 3, 0, GF7))
+    print(rs_list_decoder(ep16, 3, 0, GF7))
+
+    p2 = [4, 0, 6]
+    ep25 = rs_encoder(p2, n1, GF7).list()
+    ep26 = rs_encoder(p2, n2, GF7).list()
+
+    print(rs_list_decoder(ep25, 3, 0, GF7))
+    print(rs_list_decoder(ep26, 3, 0, GF7))
+
+    p3 = [3, 3, 3]
+    ep35 = rs_encoder(p3, n1, GF7).list()
+    ep36 = rs_encoder(p3, n2, GF7).list()
+
+    print(rs_list_decoder(ep35, 3, 0, GF7))
+    print(rs_list_decoder(ep36, 3, 0, GF7))
+
+
+# for figure 1.5
+def fig15_tests():
+    ring = PolynomialRing(GF7, 'x')
+    p1 = [1, 5, 2]
+    ep11 = rs_encoder(p1, 5, GF7)
+    ep11 = error_generator(ep11, 2, ring)[0].list()
+    ep12 = rs_encoder(p1, 6, GF7)
+    ep12 = error_generator(ep12, 2, ring)[0].list()
+
+    p2 = [4, 0, 6]
+    ep21 = rs_encoder(p2, 5, GF7)
+    ep21 = error_generator(ep21, 2, ring)[0].list()
+    ep22 = rs_encoder(p2, 6, GF7)
+    ep22 = error_generator(ep22, 2, ring)[0].list()
+
+    p3 = [3, 3, 3]
+    ep31 = rs_encoder(p3, 5, GF7)
+    ep31 = error_generator(ep31, 2, ring)[0].list()
+    ep32 = rs_encoder(p3, 6, GF7)
+    ep32 = error_generator(ep32, 2, ring)[0].list()
+    print(f"ep32 = {ep32}")
+
+    print("For p1:")
+    print(rs_list_decoder(ep11, 3, 2, GF7))
+    print(rs_list_decoder(ep12, 3, 2, GF7))
+
+    print("For p2:")
+    print(rs_list_decoder(ep21, 3, 2, GF7))
+    print(rs_list_decoder(ep22, 3, 2, GF7))
+
+    print("For p3:")
+    print(rs_list_decoder(ep31, 3, 2, GF7))
+    print(rs_list_decoder(ep32, 3, 2, GF7))
+
+
+# for figure 1.8
+def fig18_tests():
+    ring = PolynomialRing(GF7, 'x')
+    p1 = [1, 5, 2]
+    ep1_l5 = rs_encoder(p1, 5, GF7)
+    ep11 = error_generator(ep1_l5, 1, ring)[0].list()
+
+    ep1_l6 = rs_encoder(p1, 6, GF7)
+    ep12 = error_generator(ep1_l6, 1, ring)[0].list()
+
+    ep1_l7 = rs_encoder(p1, 7, GF7)
+    ep13 = error_generator(ep1_l7, 1, ring)[0].list()
+    ep14 = error_generator(ep1_l7, 2, ring)[0].list()
+
+    p2 = [4, 0, 6]
+    ep2_l5 = rs_encoder(p2, 5, GF7)
+    ep21 = error_generator(ep2_l5, 1, ring)[0].list()
+
+    ep2_l6 = rs_encoder(p2, 6, GF7)
+    ep22 = error_generator(ep2_l6, 1, ring)[0].list()
+
+    ep2_l7 = rs_encoder(p2, 7, GF7)
+    ep23 = error_generator(ep2_l7, 1, ring)[0].list()
+    ep24 = error_generator(ep2_l7, 2, ring)[0].list()
+
+    p3 = [3, 3, 3]
+    ep3_l5 = rs_encoder(p3, 5, GF7)
+    ep31 = error_generator(ep3_l5, 1, ring)[0].list()
+
+    ep3_l6 = rs_encoder(p3, 6, GF7)
+    ep32 = error_generator(ep3_l6, 1, ring)[0].list()
+
+    ep3_l7 = rs_encoder(p3, 7, GF7)
+    ep33 = error_generator(ep3_l7, 1, ring)[0].list()
+    ep34 = error_generator(ep3_l7, 2, ring)[0].list()
+
+    print("For p1:")
+    print(rs_list_decoder(ep11, 3, 1, GF7))
+    print(rs_list_decoder(ep12, 3, 1, GF7))
+    print(rs_list_decoder(ep13, 3, 1, GF7))
+    print(rs_list_decoder(ep14, 3, 2, GF7))
+
+    print("For p2:")
+    print(rs_list_decoder(ep21, 3, 1, GF7))
+    print(rs_list_decoder(ep22, 3, 1, GF7))
+    print(rs_list_decoder(ep23, 3, 1, GF7))
+    print(rs_list_decoder(ep24, 3, 2, GF7))
+
+    print("For p3:")
+    print(rs_list_decoder(ep31, 3, 1, GF7))
+    print(rs_list_decoder(ep32, 3, 1, GF7))
+    print(rs_list_decoder(ep33, 3, 1, GF7))
+    print(rs_list_decoder(ep34, 3, 2, GF7))
+
+
+# for figure 2.2
+def fig22_tests():
+    p1 = [1, 5, 2]
+    ep11 = rs_encoder(p1, 4, GF97).list()
+    ep12 = rs_encoder(p1, 5, GF97).list()
+
+    p2 = [43, 19, 55, 28, 62, 14, 77, 31, 48, 20, 35, 66, 76, 63, 27]
+    ep21 = rs_encoder(p2, 16, GF97).list()
+    ep22 = rs_encoder(p2, 19, GF97).list()
+
+    p3 = [25, 51, 48, 79, 10, 54, 0, 1, 56, 93, 75, 91, 85, 5, 48, 77, 24, 39, 94, 11, 39, 17, 44, 18, 77, 53, 39, 1,
+          92, 35]
+    ep31 = rs_encoder(p3, 31, GF97).list()
+    ep32 = rs_encoder(p3, 35, GF97).list()
+
+    print("For p1:")
+    print(rs_list_decoder(ep11, 3, 0, GF97))
+    print(rs_list_decoder(ep12, 3, 0, GF97))
+
+    print("For p2:")
+    print(rs_list_decoder(ep21, 15, 0, GF97))
+    print(rs_list_decoder(ep22, 15, 0, GF97))
+
+    print("For p3:")
+    print(rs_list_decoder(ep31, 30, 0, GF97))
+    print(rs_list_decoder(ep32, 30, 0, GF97))
+
+    print()
+    for _ in range(10):
+        p = randomize_poly(GF97, 15)
+        t1 = rs_encoder(p, 16, GF97).list()
+        t2 = rs_encoder(p, 19, GF97).list()
+        res = (rs_list_decoder(t1, 15, 0, GF97), rs_list_decoder(t2, 15, 0, GF97))
+        print(f"p={p}")
+        print(f"n=16:{res[0]}\nn=19:{res[1]}\n")
+
+
+# for figure 2.5
+def fig25_tests():
+    k30_1 = [27, 62, 92, 45, 52, 83, 37, 21, 89, 25, 51, 25, 21, 92, 74, 66, 20, 96, 58, 38, 80, 61, 42, 87, 75, 72, 76,
+             92, 17, 9]
+    k30_2 = [84, 54, 38, 89, 84, 67, 68, 18, 6, 36, 11, 12, 82, 4, 77, 51, 39, 92, 58, 28, 15, 84, 28, 49, 52, 88, 38,
+             13, 58, 6]
+    k45_1 = [92, 13, 24, 91, 68, 7, 24, 82, 70, 21, 73, 70, 6, 44, 74, 51, 65, 90, 57, 13, 13, 47, 37, 14, 61, 34, 63,
+             37, 13, 61, 47, 4, 4, 75, 11, 54, 29, 63, 46, 49, 22, 8, 32, 77, 53]
+    k45_2 = [6, 78, 87, 84, 31, 79, 81, 85, 29, 77, 76, 34, 85, 2, 22, 94, 88, 53, 53, 14, 77, 10, 67, 13, 50, 82, 52,
+             48, 55, 9, 80, 49, 79, 67, 16, 68, 24, 37, 11, 58, 54, 75, 50, 41, 57]
+
+    n1 = 60
+    n2 = 97
+    ring97 = PolynomialRing(GF97, 'x')
+
+    e30_11 = rs_encoder(k30_1, n1, GF97)
+    e30_11 = error_generator(e30_11, 2, ring97)[0].list()
+    e30_12 = rs_encoder(k30_1, n2, GF97)
+    e30_12 = error_generator(e30_12, 2, ring97)[0].list()
+
+    e30_21 = rs_encoder(k30_2, n1, GF97)
+    e30_21 = error_generator(e30_21, 2, ring97)[0].list()
+    e30_22 = rs_encoder(k30_2, n2, GF97)
+    e30_22 = error_generator(e30_22, 2, ring97)[0].list()
+
+    e45_11 = rs_encoder(k45_1, n1, GF97)
+    e45_11 = error_generator(e45_11, 2, ring97)[0].list()
+    e45_12 = rs_encoder(k45_1, n2, GF97)
+    e45_12 = error_generator(e45_12, 2, ring97)[0].list()
+
+    e45_21 = rs_encoder(k45_2, n1, GF97)
+    e45_21 = error_generator(e45_21, 2, ring97)[0].list()
+    e45_22 = rs_encoder(k45_2, n2, GF97)
+    e45_22 = error_generator(e45_22, 2, ring97)[0].list()
+
+    print("k=30 n=60")
+    print(rs_list_decoder(e30_11, 30, 2, GF97))
+    print(rs_list_decoder(e30_21, 30, 2, GF97))
+
+    print("k=30 n=97")
+    print(rs_list_decoder(e30_12, 30, 2, GF97))
+    print(rs_list_decoder(e30_22, 30, 2, GF97))
+
+    print("k=45 n=60")
+    print(rs_list_decoder(e45_11, 45, 2, GF97))
+    print(rs_list_decoder(e45_21, 45, 2, GF97))
+
+    print("k=45 n=97")
+    print(rs_list_decoder(e45_12, 45, 2, GF97))
+    print(rs_list_decoder(e45_22, 45, 2, GF97))
+
+
+# for figure 2.8
+def fig28_tests():
+    k3 = [91, 81, 51]
+    k15 = [64, 6, 19, 91, 5, 48, 61, 44, 77, 34, 66, 83, 84, 29, 8]
+    k30 = [37, 17, 12, 28, 85, 51, 84, 69, 69, 7, 33, 9, 80, 59, 10, 90, 57, 10, 53, 91, 33, 81, 58, 16, 24, 61, 62, 28,
+           76, 67]
+    k45 = [72, 31, 43, 95, 70, 69, 88, 88, 13, 16, 77, 67, 33, 34, 41, 70, 0, 71, 7, 65, 20, 61, 8, 75, 31, 29, 83, 54,
+           73, 42, 7, 87, 78, 58, 22, 58, 87, 54, 34, 9, 87, 21, 13, 77, 67]
+
+    n1 = 60
+    n2 = 79
+    n3 = 97
+    ring97 = PolynomialRing(GF97, 'x')
+
+    def get_err(n, k):
+        return (n - k) // 3
+
+    e31 = rs_encoder(k3, n1, GF97)
+    err_31 = error_generator(e31, get_err(n1, 3), ring97)[0].list()
+
+    e32 = rs_encoder(k3, n2, GF97)
+    err_32 = error_generator(e32, get_err(n2, 3), ring97)[0].list()
+
+    e33 = rs_encoder(k3, n3, GF97)
+    err_33 = error_generator(e33, get_err(n3, 3), ring97)[0].list()
+
+    e151 = rs_encoder(k15, n1, GF97)
+    err_151 = error_generator(e151, get_err(n1, 15), ring97)[0].list()
+
+    e152 = rs_encoder(k15, n2, GF97)
+    err_152 = error_generator(e152, get_err(n2, 15), ring97)[0].list()
+
+    e153 = rs_encoder(k15, n3, GF97)
+    err_153 = error_generator(e153, get_err(n3, 15), ring97)[0].list()
+
+    e301 = rs_encoder(k30, n1, GF97)
+    err_301 = error_generator(e301, get_err(n1, 30), ring97)[0].list()
+
+    e302 = rs_encoder(k30, n2, GF97)
+    err_302 = error_generator(e302, get_err(n2, 30), ring97)[0].list()
+
+    e303 = rs_encoder(k30, n3, GF97)
+    err_303 = error_generator(e303, get_err(n3, 30), ring97)[0].list()
+
+    e451 = rs_encoder(k45, n1, GF97)
+    err_451 = error_generator(e451, get_err(n1, 45), ring97)[0].list()
+
+    e452 = rs_encoder(k45, n2, GF97)
+    err_452 = error_generator(e452, get_err(n2, 45), ring97)[0].list()
+
+    e453 = rs_encoder(k45, n3, GF97)
+    err_453 = error_generator(e453, get_err(n3, 45), ring97)[0].list()
+
+    print("k=3")
+    print(f"n=60 => {rs_list_decoder(err_31, 3, get_err(n1, 3), GF97)}")
+    print(f"n=79 => {rs_list_decoder(err_32, 3, get_err(n2, 3), GF97)}")
+    print(f"n=97 => {rs_list_decoder(err_33, 3, get_err(n3, 3), GF97)}")
+
+    print("k=15")
+    print(f"n=60 => {rs_list_decoder(err_151, 15, get_err(n1, 15), GF97)}")
+    print(f"n=79 => {rs_list_decoder(err_152, 15, get_err(n2, 15), GF97)}")
+    print(f"n=97 => {rs_list_decoder(err_153, 15, get_err(n3, 15), GF97)}")
+
+    print("k=30")
+    print(f"n=60 => {rs_list_decoder(err_301, 30, get_err(n1, 30), GF97)}")
+    print(f"n=79 => {rs_list_decoder(err_302, 30, get_err(n2, 30), GF97)}")
+    print(f"n=97 => {rs_list_decoder(err_303, 30, get_err(n3, 30), GF97)}")
+
+    print("k=45")
+    print(f"n=60 => {rs_list_decoder(err_451, 45, get_err(n1, 45), GF97)}")
+    print(f"n=79 => {rs_list_decoder(err_452, 45, get_err(n2, 45), GF97)}")
+    print(f"n=97 => {rs_list_decoder(err_453, 45, get_err(n3, 45), GF97)}")
+
+
+# for figure 2.11
+def fig211_tests():
+    p1 = [1, 5, 2]
+    p2 = [4, 0, 6]
+    p3 = [45, 12, 76]
+    n = 97
+    err1 = 60
+    err2 = 70
+    err3 = 72
+    err4 = 73
+
+    ring97 = PolynomialRing(GF97, 'x')
+
+    e1 = rs_encoder(p1, n, GF97)
+    e2 = rs_encoder(p2, n, GF97)
+    e3 = rs_encoder(p3, n, GF97)
+
+    pe11 = error_generator(e1, err1, ring97)[0].list()
+    pe12 = error_generator(e1, err2, ring97)[0].list()
+    pe13 = error_generator(e1, err3, ring97)[0].list()
+    pe14 = error_generator(e1, err4, ring97)[0].list()
+
+    pe21 = error_generator(e2, err1, ring97)[0].list()
+    pe22 = error_generator(e2, err2, ring97)[0].list()
+    pe23 = error_generator(e2, err3, ring97)[0].list()
+    pe24 = error_generator(e2, err4, ring97)[0].list()
+
+    pe31 = error_generator(e3, err1, ring97)[0].list()
+    pe32 = error_generator(e3, err2, ring97)[0].list()
+    pe33 = error_generator(e3, err3, ring97)[0].list()
+    pe34 = error_generator(e3, err4, ring97)[0].list()
+
+    print(f"p1 with {err1} errors: {rs_list_decoder(pe11, 3, err1, GF97)}")
+    print(f"p1 with {err2} errors: {rs_list_decoder(pe12, 3, err2, GF97)}")
+    print(f"p1 with {err3} errors: {rs_list_decoder(pe13, 3, err3, GF97)}")
+    print(f"p1 with {err4} errors: {rs_list_decoder(pe14, 3, err4, GF97)}")
+    print()
+
+    print(f"p2 with {err1} errors: {rs_list_decoder(pe21, 3, err1, GF97)}")
+    print(f"p2 with {err2} errors: {rs_list_decoder(pe22, 3, err2, GF97)}")
+    print(f"p2 with {err3} errors: {rs_list_decoder(pe23, 3, err3, GF97)}")
+    print(f"p2 with {err4} errors: {rs_list_decoder(pe24, 3, err4, GF97)}")
+    print()
+
+    print(f"p3 with {err1} errors: {rs_list_decoder(pe31, 3, err1, GF97)}")
+    print(f"p3 with {err2} errors: {rs_list_decoder(pe32, 3, err2, GF97)}")
+    print(f"p3 with {err3} errors: {rs_list_decoder(pe33, 3, err3, GF97)}")
+    print(f"p3 with {err4} errors: {rs_list_decoder(pe34, 3, err4, GF97)}")
+
+
+# for figure 2.13
+def fig213_tests():
+    p1 = [1, 5, 2]
+    p2 = [4, 0, 6]
+    p3 = [3, 3, 3]
+
+    e1 = rs_encoder(p1, 3, GF97).list()
+    e2 = rs_encoder(p2, 3, GF97).list()
+    e3 = rs_encoder(p3, 3, GF97).list()
+
+    print(f"p1 result {rs_list_decoder(e1, 3, 0, GF97)}")
+    print(f"p2 result {rs_list_decoder(e2, 3, 0, GF97)}")
+    print(f"p3 result {rs_list_decoder(e3, 3, 0, GF97)}")
+
+    p4 = [37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37]
+    e4 = rs_encoder(p4, 15, GF97).list()
+    print(f"p4 result {rs_list_decoder(e4, 15, 0, GF97)}")
+
+    p5 = [65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+          65, 65, 65]
+    e5 = rs_encoder(p5, 30, GF97).list()
+    print(f"p5 result {rs_list_decoder(e5, 30, 0, GF97)}")
+
+    p6 = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+          10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
+    e6 = rs_encoder(p6, 45, GF97).list()
+    print(f"p6 result {rs_list_decoder(e6, 45, 0, GF97)}")
+
+
+# for figure 2.15
+def fig215_tests():
+    p4 = [13, 7, 91, 34]
+    p5 = [41, 73, 9, 34, 42]
+
+    n = 97
+
+    err4 = (n + (n - 4) // 2) // 2
+    err5 = (n + (n - 5) // 2) // 2
+
+    ring97 = PolynomialRing(GF97, 'x')
+
+    e4 = rs_encoder(p4, n, GF97)
+    e5 = rs_encoder(p5, n, GF97)
+
+    pe4 = error_generator(e4, err4, ring97)[0].list()
+    pe5 = error_generator(e5, err5, ring97)[0].list()
+
+    print(f"for k=4 with {err4} errors, the list decoder: {rs_list_decoder(pe4, 4, err4, GF97)}")
+    print(f"for k=5 with {err5} errors, the list decoder: {rs_list_decoder(pe5, 5, err5, GF97)}")
+
+    pe4 = error_generator(e4, 69, ring97)[0].list()
+    pe5 = error_generator(e5, 65, ring97)[0].list()
+
+    print(f"for k=4 with 69 errors, the list decoder: {rs_list_decoder(pe4, 4, 69, GF97)}")
+    print(f"for k=5 with 65 errors, the list decoder: {rs_list_decoder(pe5, 5, 65, GF97)}")
+
+
+# fig12_tests()
+# fig15_tests()
+# fig18_tests()
+# fig22_tests()
+# fig25_tests()
+# fig28_tests()
+# fig211_tests()
+# fig213_tests()
+# fig215_tests()
 
 
 """
 TESTS ARE HERE
 """
-# test_decoders(GF97, ks_for_gf7)
+# test_decoders(GF7, ks_for_gf7)
+test_decoders(GF97, ks_for_gf7)
+# test_decoders(GF929, ks_for_gf929)
