@@ -11,6 +11,7 @@ Note that to change the parameters of how many polynomials and how many differen
 values (be it the encoded length 𝑛 or the number of errors 𝑒 in the different tests) to use,
 look for the parameters “num_of_num_of_polys_per_k” and “num_of_params” and
 change them as needed.
+
 Option 2: To run methods individually:
 1. rs_encoder ≔ encoder
 2. rs_decoder ≔ unique decoder (Berlekamp-Welch)
